@@ -2,7 +2,12 @@ const express = require('express');
 const router = express.Router();
 const gravatar = require('gravatar');
 const bcrypt = require('bcryptjs');
+const passport = require('passport');
 const jwt = require('jsonwebtoken');
+
+/** Load input validation */
+const validateRegisterInput = require('../../validation/register');
+const validateLoginInput = require('../../validation/login');
 
 /**
  * @route POST api/users/register
@@ -11,11 +16,20 @@ const jwt = require('jsonwebtoken');
  */
 const User = require('../../models/User');
  router.post('/register', (req, res) => {
+
+    /** First thing first, validation check */
+    const { errors, isValid} = validateRegisterInput(req.body);
+    if(!isValid){
+        return res.status(400).json(errors);
+    }
+
     User
         .findOne({email: req.body.email})
         .then((user) => {
             if(user){
-                res.status(400).json({email: 'Email already exists'});
+                errors.email = 'Email already exists';
+                res.status(400).json(errors);
+                // res.status(400).json({email: 'Email already exists'});
             } else {
                 const avatar = gravatar.url(req.body.email, {
                     s:'200', 
@@ -58,6 +72,13 @@ const User = require('../../models/User');
  */
 
  router.post('/login', (req, res) => {
+
+    /** First thing first, validation check */
+    const { errors, isValid} = validateLoginInput(req.body);
+    if(!isValid){
+        return res.status(400).json(errors);
+    }
+
     const email = req.body.email;
     const password =  req.body.password;
 
@@ -66,7 +87,9 @@ const User = require('../../models/User');
         .findOne({email: email})
         .then((user) => {
             if(!user){
-                return res.status(404).json({email: 'User not found'})
+                errors.email = 'User not found'
+                return res.status(404).json(errors)
+                // return res.status(404).json({email: 'User not found'})
             } else {
                 /** Check the password */
                 bcrypt
@@ -95,11 +118,27 @@ const User = require('../../models/User');
                             )
 
                         } else {
-                            return res.status(400).json({password: 'Password incorrect'});
+                            errors.password = 'Password incorrect';
+                            return res.status(400).json(errors);
+                            // return res.status(400).json({password: 'Password incorrect'});
                         }
                     })
             }
         })
+ })
+
+ /**
+ * @route GET api/users/current
+ * @desc  Return current user
+ * @access Private
+ */
+
+ router.get('/current', passport.authenticate('jwt', {session:false}), (req, res) => {
+    res.json({
+        id: req.user.id,
+        name: req.user.name,
+        email: req.user.email,
+    });
  })
 
 
